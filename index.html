@@ -61,8 +61,8 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .st2{padding:14px 16px;padding-top:calc(14px + env(safe-area-inset-top,0));display:flex;justify-content:space-between;align-items:center}
 .stl{color:#fff;font-size:15px;font-weight:600}
 .scl{width:40px;height:40px;border:none;background:rgba(255,255,255,.15);color:#fff;border-radius:50%;font-size:18px;cursor:pointer}
-#sc-box{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;width:100%;max-height:70vh}
-#sc-box video{width:100%!important;height:auto!important;object-fit:cover}
+#sc-box{flex:1;display:flex;align-items:center;justify-content:center;overflow:hidden;width:100%}
+#sc-box video,#sc-box canvas{width:100%!important;height:100%!important;object-fit:cover}
 .smb{padding:14px 16px;padding-bottom:calc(14px + env(safe-area-inset-bottom,0))}
 .smr{display:flex;gap:8px}.smr input{flex:1;padding:12px;border:none;border-radius:var(--r);font-size:15px;font-family:ui-monospace,monospace}
 .smr button{padding:12px 20px;border:none;border-radius:var(--r);background:var(--amber);color:#1a1c24;font-weight:700;font-size:14px;cursor:pointer}
@@ -368,15 +368,24 @@ function doPhoto(input){
 }
 
 // ===== SCANNER =====
+var scCfg={fps:15,qrbox:function(vw,vh){var w=Math.round(vw*.92);var h=Math.round(vh*.55);return{width:Math.max(260,w),height:Math.max(140,h)}}};
+function scanStart(cam){
+  scI=new Html5Qrcode('sc-box');
+  return scI.start(cam,scCfg,
+    function(val){if(navigator.vibrate)navigator.vibrate(150);fillSc(val);scClose()},
+    function(){});
+}
 function scan(tid,lbl){
   scT=tid;$('sc-lbl').textContent=lbl;$('sc-man').value='';$('sc-ov').classList.add('on');
   setTimeout(function(){
-    try{scI=new Html5Qrcode('sc-box');
-    scI.start({facingMode:'environment',advanced:[{width:{ideal:1920}},{height:{ideal:1080}}]},
-    {fps:15,qrbox:function(vw,vh){var w=Math.min(vw-20,600);var h=Math.min(vh-20,400);return{width:Math.max(280,w),height:Math.max(160,h)}},
-    aspectRatio:1.7778,disableFlip:false,experimentalFeatures:{useBarCodeDetectorIfSupported:true}},
-    function(val){if(navigator.vibrate)navigator.vibrate(150);fillSc(val);scClose()},function(){}).catch(function(e){console.warn(e)})}catch(e){console.warn(e)}
-  },250);
+    try{
+      scanStart({facingMode:'environment',width:{ideal:1920},height:{ideal:1080}})
+      .catch(function(){
+        try{scI.clear()}catch(e){}
+        return scanStart({facingMode:'environment'});
+      }).catch(function(e){console.warn('Scanner:',e)});
+    }catch(e){console.warn(e)}
+  },300);
 }
 function scMan(){var v=$('sc-man').value.trim();if(v){fillSc(v);scClose()}}
 function fillSc(v){if(!scT)return;var el=$(scT);el.value=v;el.classList.add('ok');if(scT==='s-q')doSrch();toast(v.length>28?v.substring(0,28)+'…':v)}
