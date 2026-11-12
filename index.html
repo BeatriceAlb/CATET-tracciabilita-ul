@@ -67,10 +67,19 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .smr{display:flex;gap:8px}.smr input{flex:1;padding:12px;border:none;border-radius:var(--r);font-size:15px;font-family:ui-monospace,monospace}
 .smr button{padding:12px 20px;border:none;border-radius:var(--r);background:var(--amber);color:#1a1c24;font-weight:700;font-size:14px;cursor:pointer}
 .smh{color:rgba(255,255,255,.45);font-size:12px;text-align:center;margin-top:6px}
+/* Webcam modal */
+.wc-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.94);z-index:200;flex-direction:column;align-items:center;justify-content:center}.wc-ov.on{display:flex}
+.wc-box{position:relative;width:90%;max-width:640px}
+.wc-box video{width:100%;border-radius:var(--r);background:#000}
+.wc-box canvas{display:none}
+.wc-bar{display:flex;gap:10px;margin-top:12px;justify-content:center}
+.wc-bar button{padding:12px 28px;border:none;border-radius:var(--r);font-size:15px;font-weight:700;cursor:pointer}
 /* Photo viewer */
 .pv{display:none;position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:200;align-items:center;justify-content:center;padding:20px}.pv.on{display:flex}
 .pv img{max-width:100%;max-height:85vh;object-fit:contain;border-radius:8px}
 .pvc{position:absolute;top:calc(16px + env(safe-area-inset-top,0));right:16px;width:40px;height:40px;background:rgba(255,255,255,.2);color:#fff;border:none;border-radius:50%;font-size:18px;cursor:pointer}
+/* PC hint */
+.pc-hint{font-size:11px;color:var(--green);font-style:italic;margin-top:2px}
 /* Toast */
 .tt{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:24px;font-size:13px;font-weight:600;z-index:300;opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;max-width:90vw;overflow:hidden;text-overflow:ellipsis}.tt.show{opacity:1}
 .es{text-align:center;padding:36px 20px;color:var(--text-m)}.es p{font-size:14px}
@@ -125,8 +134,16 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
     <div class="sg"><div class="sl">QR code etichetta</div><div style="font-size:11px;color:var(--text-l);margin:-2px 0 6px;line-height:1.4">Se il QR non funziona, digita manualmente oppure metti solo un punto (.)</div><div class="sr"><input type="text" id="f-qr" class="si" placeholder="Scansiona QR oppure ."><button class="sb" onclick="scan('f-qr','QR etichetta')">⌗</button></div></div>
     <div class="sg"><div class="sl">Foto etichetta UL</div>
       <div class="pa" id="f-pa" onclick="document.getElementById('f-ph').click()">
-        <div style="font-size:24px">📷</div><div style="font-size:13px;color:var(--text-m)">Tocca per scattare</div>
+        <div style="font-size:24px">📷</div><div style="font-size:13px;color:var(--text-m)" id="ph-hint">Tocca per scattare</div>
         <input type="file" id="f-ph" accept="image/*" capture="environment" onchange="doPhoto(this)">
+      </div>
+      <div id="ph-pc-opts" style="display:none;margin-top:8px">
+        <button class="bt bt-a bt-s" onclick="phonePhoto()" style="width:100%;margin-bottom:6px">📱 Scatta da telefono</button>
+        <div style="display:flex;gap:8px">
+          <button class="bt bt-o bt-s" onclick="document.getElementById('f-ph').click()" style="flex:1">📁 Carica da file</button>
+          <button class="bt bt-o bt-s" onclick="wcOpen()" style="flex:1">🎥 Webcam</button>
+        </div>
+        <button class="bt bt-gh" onclick="skipPhoto()" style="font-size:12px;margin-top:4px;padding:8px">Salta foto (aggiungi dopo)</button>
       </div>
     </div>
   </div>
@@ -189,6 +206,49 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
     </div>
     <div class="smr"><input type="text" id="sc-man" placeholder="Digita manualmente"><button onclick="scMan()">OK</button></div>
     <div class="smh">Inquadra il barcode oppure digita il codice</div>
+  </div>
+</div>
+
+<!-- QR PHONE PHOTO MODAL -->
+<div class="wc-ov" id="qr-ov">
+  <div style="color:#fff;font-size:16px;font-weight:700;margin-bottom:8px">📱 Scatta foto dal telefono</div>
+  <div style="background:#fff;border-radius:var(--r);padding:16px;text-align:center" id="qr-box">
+    <img id="qr-img" src="" style="width:220px;height:220px">
+  </div>
+  <div style="color:rgba(255,255,255,.7);font-size:13px;margin-top:12px;text-align:center;max-width:320px;line-height:1.5" id="qr-msg">
+    Inquadra questo QR con il telefono.<br>Si aprirà la fotocamera per scattare la foto.
+  </div>
+  <div style="margin-top:12px;display:flex;gap:10px">
+    <button style="padding:12px 28px;border:none;border-radius:var(--r);font-size:15px;font-weight:700;cursor:pointer;background:rgba(255,255,255,.15);color:#fff" onclick="qrClose()">✕ Annulla</button>
+  </div>
+</div>
+
+<!-- PHONE CAMERA MODE (shown when ?cam=TOKEN) -->
+<div id="p-cam" class="pg" style="display:none">
+  <div style="text-align:center;padding:40px 16px">
+    <h1 style="font-size:22px;color:var(--navy);letter-spacing:2px;font-weight:800">C.A.T.E.T</h1>
+    <p style="font-size:13px;color:var(--text-m);margin-top:4px">Foto etichetta UL</p>
+    <div class="cd mt16">
+      <div class="pa" id="cam-pa" onclick="document.getElementById('cam-ph').click()">
+        <div style="font-size:36px">📷</div>
+        <div style="font-size:15px;color:var(--text-m)">Tocca per scattare foto</div>
+        <input type="file" id="cam-ph" accept="image/*" capture="environment" onchange="camDoPhoto(this)" style="display:none">
+      </div>
+      <div id="cam-status" style="margin-top:12px;font-size:14px;color:var(--text-m)"></div>
+    </div>
+  </div>
+</div>
+
+<!-- WEBCAM MODAL -->
+<div class="wc-ov" id="wc-ov">
+  <div style="color:#fff;font-size:16px;font-weight:700;margin-bottom:12px">📷 Webcam — Foto etichetta UL</div>
+  <div class="wc-box">
+    <video id="wc-vid" autoplay playsinline></video>
+    <canvas id="wc-can"></canvas>
+  </div>
+  <div class="wc-bar">
+    <button style="background:var(--amber);color:#1a1c24" onclick="wcSnap()">📷 Scatta foto</button>
+    <button style="background:rgba(255,255,255,.15);color:#fff" onclick="wcClose()">✕ Chiudi</button>
   </div>
 </div>
 
@@ -257,8 +317,10 @@ function resetF(){
   ['f-lo','f-art','f-dd','f-ea','f-qr'].forEach(function(id){var e=$(id);e.value='';e.classList.remove('ok')});
   curPh=null;
   var pa=$('f-pa');pa.classList.remove('hp');
-  pa.innerHTML='<div style="font-size:24px">📷</div><div style="font-size:13px;color:var(--text-m)">Tocca per scattare</div><input type="file" id="f-ph" accept="image/*" capture="environment" onchange="doPhoto(this)">';
+  pa.innerHTML='<div style="font-size:24px">📷</div><div style="font-size:13px;color:var(--text-m)" id="ph-hint">'+(isPC?'Clicca per scegliere file':'Tocca per scattare')+'</div><input type="file" id="f-ph" accept="image/*"'+(isPC?'':' capture="environment"')+' onchange="doPhoto(this)">';
   $('cft').textContent='Cavo '+(cur.cables.length+1);
+  // Restore PC options visibility
+  var opts=$('ph-pc-opts');if(opts)opts.style.display=isPC?'block':'none';
 }
 
 function getF(){
@@ -551,7 +613,193 @@ function pvClose(){$('pv').classList.remove('on')}
 function esc(s){if(!s)return'';var d=document.createElement('div');d.textContent=s;return d.innerHTML}
 var ttT;function toast(m){var e=$('tt');e.textContent=m;e.classList.add('show');clearTimeout(ttT);ttT=setTimeout(function(){e.classList.remove('show')},2400)}
 document.addEventListener('input',function(e){if(e.target.classList.contains('si'))e.target.classList.toggle('ok',e.target.value.trim().length>0)});
-init();
+
+// ===== PC / MOBILE DETECTION =====
+var isPC=!(/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent));
+
+// ===== BARCODE GUN SUPPORT =====
+// Barcode guns type fast then send Enter — handle Enter on barcode fields to advance
+var fieldOrder=['i-pi','f-lo','f-art','f-dd','f-ea','f-qr'];
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Enter')return;
+  var el=document.activeElement;if(!el||!el.id)return;
+  var idx=fieldOrder.indexOf(el.id);
+  if(idx<0)return;
+  e.preventDefault();
+  el.classList.toggle('ok',el.value.trim().length>0);
+  if(navigator.vibrate)navigator.vibrate(80);
+  toast(el.value.trim().length>28?el.value.trim().substring(0,28)+'…':el.value.trim());
+  // Advance to next visible field
+  for(var i=idx+1;i<fieldOrder.length;i++){
+    var nxt=$(fieldOrder[i]);
+    if(nxt&&nxt.offsetParent!==null){nxt.focus();nxt.select();return}
+  }
+  el.blur();
+});
+
+// ===== WEBCAM CAPTURE =====
+var wcStream=null;
+function wcOpen(){
+  $('wc-ov').classList.add('on');
+  navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'environment'}})
+  .then(function(stream){
+    wcStream=stream;
+    $('wc-vid').srcObject=stream;
+  }).catch(function(err){
+    toast('Webcam non disponibile: '+err.message);
+    wcClose();
+  });
+}
+function wcSnap(){
+  var vid=$('wc-vid'),can=$('wc-can');
+  can.width=vid.videoWidth;can.height=vid.videoHeight;
+  can.getContext('2d').drawImage(vid,0,0);
+  // Compress like mobile photos
+  var sc=Math.min(1,400/can.width);
+  var out=document.createElement('canvas');
+  out.width=can.width*sc;out.height=can.height*sc;
+  out.getContext('2d').drawImage(can,0,0,out.width,out.height);
+  curPh=out.toDataURL('image/jpeg',0.4);
+  var pa=$('f-pa');pa.classList.add('hp');
+  pa.innerHTML='<img src="'+curPh+'"><input type="file" id="f-ph" accept="image/*"'+(isPC?'':' capture="environment"')+' onchange="doPhoto(this)">';
+  wcClose();
+  toast('Foto scattata');
+}
+function wcClose(){
+  if(wcStream){wcStream.getTracks().forEach(function(t){t.stop()});wcStream=null}
+  $('wc-vid').srcObject=null;
+  $('wc-ov').classList.remove('on');
+}
+
+// ===== SKIP PHOTO =====
+function skipPhoto(){
+  curPh=null;
+  var pa=$('f-pa');pa.classList.add('hp');
+  pa.innerHTML='<div style="padding:12px;text-align:center"><div style="font-size:18px">⏭</div><div style="font-size:13px;color:var(--text-m)">Foto saltata</div></div><input type="file" id="f-ph" accept="image/*"'+(isPC?'':' capture="environment"')+' onchange="doPhoto(this)">';
+  toast('Foto saltata — puoi aggiungerla dopo');
+}
+
+// ===== PC UI ADAPTATIONS =====
+function adaptPC(){
+  if(!isPC)return;
+  // Show PC photo options (file upload + webcam + skip)
+  var opts=$('ph-pc-opts');if(opts)opts.style.display='block';
+  // Change photo area hint
+  var ph=$('ph-hint');if(ph)ph.textContent='Clicca per scegliere file';
+  // Remove capture attribute on PC (it forces camera on some browsers)
+  var fi=$('f-ph');if(fi)fi.removeAttribute('capture');
+  // Change scanner button tooltips
+  document.querySelectorAll('.sb').forEach(function(btn){
+    btn.title='Apri scanner fotocamera (su PC usa la pistola nel campo)';
+  });
+}
+
+// ===== PHONE PHOTO RELAY =====
+var qrPollTimer=null;
+var qrToken=null;
+
+function phonePhoto(){
+  if(!API_URL){toast('Configura prima l\'URL Google Apps Script');return}
+  // Generate random token
+  qrToken='p'+Date.now()+Math.random().toString(36).substr(2,6);
+  // Build URL for phone camera mode
+  var base=location.href.split('?')[0].split('#')[0];
+  var camUrl=base+'?cam='+qrToken+'&api='+encodeURIComponent(API_URL);
+  // Show QR modal with QR code image
+  var qrApi='https://api.qrserver.com/v1/create-qr-code/?size=220x220&data='+encodeURIComponent(camUrl);
+  $('qr-img').src=qrApi;
+  $('qr-msg').innerHTML='Inquadra questo QR con il telefono.<br>Si aprirà la fotocamera per scattare la foto.';
+  $('qr-ov').classList.add('on');
+  // Start polling Apps Script for the photo
+  qrPollTimer=setInterval(function(){
+    fetch(API_URL+'?action=get_photo&token='+qrToken,{mode:'cors'})
+    .then(function(r){return r.json()})
+    .then(function(j){
+      if(j.status==='ok'&&j.foto){
+        // Photo received!
+        curPh=j.foto;
+        var pa=$('f-pa');pa.classList.add('hp');
+        pa.innerHTML='<img src="'+curPh+'"><input type="file" id="f-ph" accept="image/*"'+(isPC?'':' capture="environment"')+' onchange="doPhoto(this)">';
+        qrClose();
+        toast('📷 Foto ricevuta dal telefono!');
+      }
+    }).catch(function(){});
+  },2500);
+}
+
+function qrClose(){
+  if(qrPollTimer){clearInterval(qrPollTimer);qrPollTimer=null}
+  qrToken=null;
+  $('qr-ov').classList.remove('on');
+}
+
+// ===== PHONE CAMERA MODE (?cam=TOKEN) =====
+function checkCamMode(){
+  var params=new URLSearchParams(location.search);
+  var token=params.get('cam');
+  if(!token)return false;
+  // Hide all pages, show camera mode
+  document.querySelectorAll('.pg').forEach(function(p){p.classList.remove('on');p.style.display='none'});
+  $('p-cam').style.display='block';$('p-cam').classList.add('on');
+  // Store token for upload
+  window._camToken=token;
+  return true;
+}
+
+function camDoPhoto(input){
+  var file=input.files[0];if(!file)return;
+  var status=$('cam-status');
+  status.textContent='Elaborazione foto...';
+  status.style.color='var(--text-m)';
+
+  var reader=new FileReader();
+  reader.onload=function(e){
+    var img=new Image();img.onload=function(){
+      // Compress: 400px max, 40% quality
+      var canvas=document.createElement('canvas');var sc=Math.min(1,400/img.width);
+      canvas.width=img.width*sc;canvas.height=img.height*sc;
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      var foto=canvas.toDataURL('image/jpeg',0.4);
+
+      // Show preview
+      var pa=$('cam-pa');
+      pa.innerHTML='<img src="'+foto+'" style="max-width:100%;max-height:200px;border-radius:8px">';
+
+      // Send to Apps Script relay
+      status.textContent='Invio al PC in corso...';
+      var params=new URLSearchParams(location.search);
+      var apiUrl=params.get('api')||'';
+      try{if(!apiUrl)apiUrl=localStorage.getItem('ct_url')||''}catch(e){}
+      if(!apiUrl){
+        status.innerHTML='<span style="color:var(--red)">Errore: URL Apps Script non disponibile.</span><br><span style="font-size:12px">Riprova dal QR code sul PC.</span>';
+        return;
+      }
+
+      fetch(apiUrl,{
+        method:'POST',
+        headers:{'Content-Type':'text/plain'},
+        body:JSON.stringify({action:'upload_photo',token:window._camToken,foto:foto})
+      }).then(function(r){return r.json()})
+      .then(function(j){
+        if(j.status==='ok'){
+          status.innerHTML='<span style="color:var(--green)">✓ Foto inviata al PC!</span><br><span style="font-size:12px">Puoi chiudere questa pagina.</span>';
+          pa.innerHTML='<div style="font-size:48px">✅</div><div style="font-size:16px;color:var(--green);font-weight:700">Fatto!</div>';
+        }else{
+          status.innerHTML='<span style="color:var(--red)">Errore: '+(j.message||'sconosciuto')+'</span>';
+        }
+      }).catch(function(err){
+        status.innerHTML='<span style="color:var(--red)">Errore invio: '+err.message+'</span><br><span style="font-size:12px">Verifica la connessione internet.</span>';
+      });
+    };img.src=e.target.result;
+  };reader.readAsDataURL(file);
+  input.value='';
+}
+
+// Check if we're in phone camera mode BEFORE init
+if(!checkCamMode()){
+  init();
+  adaptPC();
+}
 </script>
 </body>
 </html>
